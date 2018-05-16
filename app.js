@@ -20,7 +20,12 @@ const delay = function(timeout) {
 
 app.get("/", async (req, res) => {
   var coin_symbol = req.query.coin_symbol;
-  let json_response = {};
+
+  // This will be overwritten if everything goes as planned.
+  let json_response = {
+    error: true,
+    message: "something went wrong"
+  };
 
   const browser = await puppeteer.launch({
     args: ["--no-sandbox", "--disable-setuid-sandbox"]
