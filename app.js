@@ -89,9 +89,9 @@ app.get("/", async (req, res) => {
   } catch (e) {
     page.close();
 
-    if (!browser) {
-      initBrowser();
-    }
+    await browser.close()
+
+    initBrowser();
 
     console.log(e.message);
   }
