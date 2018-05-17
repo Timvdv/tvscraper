@@ -88,7 +88,11 @@ app.get("/", async (req, res) => {
 
   } catch (e) {
     page.close();
-    process.exit();
+
+    if (!browser) {
+      initBrowser();
+    }
+
     console.log(e.message);
   }
 
