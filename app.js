@@ -3,7 +3,7 @@ const app = express();
 const puppeteer = require("puppeteer");
 const port = process.env.PORT || 8080;
 
-var parseUrl = function(url) {
+var parseUrl = function (url) {
   url = decodeURIComponent(url);
   if (!/^(?:f|ht)tps?\:\/\//.test(url)) {
     url = "http://" + url;
@@ -12,11 +12,22 @@ var parseUrl = function(url) {
   return url;
 };
 
-const delay = function(timeout) {
+const delay = function (timeout) {
   return new Promise(resolve => {
     setTimeout(resolve, timeout);
   });
 };
+
+let browser = null;
+
+async function initBrowser() {
+  browser = await puppeteer.launch({
+    args: ["--no-sandbox", "--disable-setuid-sandbox"]
+  });
+}
+
+initBrowser();
+
 
 app.get("/", async (req, res) => {
   var coin_symbol = req.query.coin_symbol;
@@ -27,24 +38,27 @@ app.get("/", async (req, res) => {
     message: "something went wrong"
   };
 
-  const browser = await puppeteer.launch({
-    args: ["--no-sandbox", "--disable-setuid-sandbox"]
-  });
+  if (!browser) {
+    throw new Error("Browser not active");
+  }
+
+  let page = await browser.newPage();
 
   try {
-    const page = await browser.newPage();
 
     if (coin_symbol === "BTC") {
       coin_symbol = "USDT";
     }
 
-    await page.goto(
+    let page_url = await page.goto(
       "https://www.tradingview.com/symbols/" +
-        coin_symbol.toUpperCase() +
-        "BTC/"
+      coin_symbol.toUpperCase() +
+      "BTC/"
     );
 
-    await page
+    // console.log(page_url);
+
+    let page_response = await page
       .waitFor("span.tv-widget-technicals__counter-number")
       .then(async () => {
         await delay(200);
@@ -68,15 +82,25 @@ app.get("/", async (req, res) => {
         });
       });
 
-    await browser.close();
+    // console.log(page_response);
+
+    page.close();
+
   } catch (e) {
+    page.close();
     console.log(e.message);
-    await browser.close();
   }
 
   return res.json(json_response);
 });
 
-app.listen(port, function() {
+app.listen(port, function () {
   console.log("App listening on port " + port);
 });
+
+var cleanExit = function () {
+  browser.close()
+  process.exit()
+};
+process.on('SIGINT', cleanExit); // catch ctrl-c
+process.on('SIGTERM', cleanExit); // catch kill
