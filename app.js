@@ -88,6 +88,7 @@ app.get("/", async (req, res) => {
 
   } catch (e) {
     page.close();
+    process.exit();
     console.log(e.message);
   }
 
