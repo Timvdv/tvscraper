@@ -22,7 +22,8 @@ let browser = null;
 
 async function initBrowser() {
   browser = await puppeteer.launch({
-    args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    headless: true
   });
 }
 
@@ -53,7 +54,9 @@ app.get("/", async (req, res) => {
     let page_url = await page.goto(
       "https://www.tradingview.com/symbols/" +
       coin_symbol.toUpperCase() +
-      "BTC/"
+      "BTC/", {
+        waitUntil: 'networkidle'
+      }
     );
 
     // console.log(page_url);
@@ -61,10 +64,31 @@ app.get("/", async (req, res) => {
     let page_response = await page
       .waitFor("span.tv-widget-technicals__counter-number")
       .then(async () => {
-        await delay(200);
+
+        // removed delay because networkidle also worked.
+        // await delay(200);
+
         // Get the "viewport" of the page, as reported by the page.
         json_response = await page.evaluate(() => {
-          console.log(document);
+
+          const idea_node_list = document.querySelectorAll(".tv-widget-idea.tv-site-widget__body");
+          const ideas = [...idea_node_list];
+
+          const ideas_mapped = ideas.map(idea => {
+            return {
+              title: idea.querySelectorAll(".tv-widget-idea__title-name")[0] && idea.querySelectorAll(".tv-widget-idea__title-name")[0].innerHTML,
+              image: idea.querySelectorAll(".tv-widget-idea__cover-link img")[0] && idea.querySelectorAll(".tv-widget-idea__cover-link img")[0].src,
+              date: idea.querySelectorAll(".tv-widget-idea__time")[0] && idea.querySelectorAll(".tv-widget-idea__time")[0].attributes["data-timestamp"] && idea.querySelectorAll(".tv-widget-idea__time")[0].attributes["data-timestamp"].value,
+              content: idea.querySelectorAll(".tv-widget-idea__description-text")[0] && idea.querySelectorAll(".tv-widget-idea__description-text")[0].innerHTML,
+              uploader: idea.querySelectorAll(".tv-user-link__name")[0] && idea.querySelectorAll(".tv-user-link__name")[0].innerHTML,
+              target: idea.querySelectorAll("a.tv-widget-idea__title")[0] && idea.querySelectorAll("a.tv-widget-idea__title")[0].href,
+              upvotes: idea.querySelectorAll(".tv-social-stats__count")[2] && idea.querySelectorAll(".tv-social-stats__count")[2].innerHTML,
+              comments: idea.querySelectorAll(".tv-social-stats__count")[1] && idea.querySelectorAll(".tv-social-stats__count")[1].innerHTML,
+              views: idea.querySelectorAll(".tv-social-stats__count")[0] && idea.querySelectorAll(".tv-social-stats__count")[0].innerHTML,
+              prediction: idea.querySelectorAll(".tv-idea-label")[0] && idea.querySelectorAll(".tv-idea-label")[0].innerHTML,
+            }
+          });
+
           return {
             recommendation: document.querySelector(
               ".tv-widget-technicals__signal-title"
@@ -77,7 +101,8 @@ app.get("/", async (req, res) => {
             )[1].textContent,
             buy: document.querySelectorAll(
               "span.tv-widget-technicals__counter-number"
-            )[2].textContent
+            )[2].textContent,
+            ideas_mapped
           };
         });
       });
@@ -107,5 +132,6 @@ var cleanExit = function () {
   browser.close()
   process.exit()
 };
+
 process.on('SIGINT', cleanExit); // catch ctrl-c
 process.on('SIGTERM', cleanExit); // catch kill
