@@ -65,8 +65,8 @@ app.get("/", async (req, res) => {
       .waitFor("span.tv-widget-technicals__counter-number")
       .then(async () => {
 
-        // removed delay because networkidle also worked.
-        // await delay(200);
+        // Delay is needed for TA valves to render on Heroku
+        await delay(200);
 
         // Get the "viewport" of the page, as reported by the page.
         json_response = await page.evaluate(() => {
