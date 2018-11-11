@@ -29,7 +29,6 @@ async function initBrowser() {
 
 initBrowser();
 
-
 app.get("/", async (req, res) => {
   var coin_symbol = req.query.coin_symbol;
 
@@ -48,13 +47,13 @@ app.get("/", async (req, res) => {
   try {
 
     if (coin_symbol === "BTC") {
-      coin_symbol = "USDT";
+      coin_symbol = "BTCUSD";
+    } else {
+      coin_symbol = coin_symbol.toUpperCase() + "BTC/";
     }
 
     let page_url = await page.goto(
-      "https://www.tradingview.com/symbols/" +
-      coin_symbol.toUpperCase() +
-      "BTC/", {
+      "https://www.tradingview.com/symbols/" + coin_symbol, {
         waitUntil: 'networkidle'
       }
     );
@@ -71,21 +70,24 @@ app.get("/", async (req, res) => {
         // Get the "viewport" of the page, as reported by the page.
         json_response = await page.evaluate(() => {
 
-          const idea_node_list = document.querySelectorAll(".tv-widget-idea.tv-site-widget__body");
+          const idea_node_list = document.querySelectorAll(".tv-widget-idea.js-widget-idea");
           const ideas = [...idea_node_list];
 
           const ideas_mapped = ideas.map(idea => {
+
+            const item = idea.attributes["data-widget-data"] && JSON.parse(idea.attributes["data-widget-data"].value) || {};
+
             return {
-              title: idea.querySelectorAll(".tv-widget-idea__title-name")[0] && idea.querySelectorAll(".tv-widget-idea__title-name")[0].innerHTML,
+              title: idea.querySelector(".tv-widget-idea__title").innerHTML,
               image: idea.querySelectorAll(".tv-widget-idea__cover-link img")[0] && idea.querySelectorAll(".tv-widget-idea__cover-link img")[0].src,
-              date: idea.querySelectorAll(".tv-widget-idea__time")[0] && idea.querySelectorAll(".tv-widget-idea__time")[0].attributes["data-timestamp"] && idea.querySelectorAll(".tv-widget-idea__time")[0].attributes["data-timestamp"].value,
-              content: idea.querySelectorAll(".tv-widget-idea__description-text")[0] && idea.querySelectorAll(".tv-widget-idea__description-text")[0].innerHTML,
-              uploader: idea.querySelectorAll(".tv-user-link__name")[0] && idea.querySelectorAll(".tv-user-link__name")[0].innerHTML,
+              date: idea.querySelector(".tv-card-stats__time").attributes["data-timestamp"].value,
+              content: idea.querySelector(".tv-widget-idea__description-text").innerHTML,
+              uploader: idea.querySelector(".tv-card-user-info__name").innerHTML,
               target: idea.querySelectorAll("a.tv-widget-idea__title")[0] && idea.querySelectorAll("a.tv-widget-idea__title")[0].href,
-              upvotes: idea.querySelectorAll(".tv-social-stats__count")[2] && idea.querySelectorAll(".tv-social-stats__count")[2].innerHTML,
-              comments: idea.querySelectorAll(".tv-social-stats__count")[1] && idea.querySelectorAll(".tv-social-stats__count")[1].innerHTML,
-              views: idea.querySelectorAll(".tv-social-stats__count")[0] && idea.querySelectorAll(".tv-social-stats__count")[0].innerHTML,
-              prediction: idea.querySelectorAll(".tv-idea-label")[0] && idea.querySelectorAll(".tv-idea-label")[0].innerHTML,
+              upvotes: parseInt(idea.querySelector(".tv-card-social-item__count").innerHTML),
+              comments: parseInt(idea.querySelector(".tv-card-social-item__count").innerHTML),
+              views: parseInt(idea.querySelector(".tv-card-stats__views").innerText),
+              prediction: idea.querySelector(".tv-card-label") && idea.querySelector(".tv-card-label").innerText,
             }
           });
 
