@@ -70,8 +70,6 @@ function initRoutes() {
       } else {
         coin_symbol = coin_symbol.toUpperCase() + "BTC";
       }
-
-      console.log(coin_symbol);
   
       await page.goto(
         "https://www.tradingview.com/symbols/" + coin_symbol, {
