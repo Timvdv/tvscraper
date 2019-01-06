@@ -18,6 +18,16 @@ const delay = function (timeout) {
   });
 };
 
+const restartBrowser = async function() {
+  try {
+    await browser.close()
+    await initBrowser();
+  } catch(e) {
+    console.log("Error inside error. Shit is really broken");
+    console.log(e);
+  }
+}
+
 let browser = null;
 
 async function initBrowser() {
@@ -27,104 +37,114 @@ async function initBrowser() {
   });
 }
 
-initBrowser();
+try {
+  initBrowser();
+  initRoutes();
+} catch(e) {
+  console.error("Could not launch browser");
+}
 
-app.get("/", async (req, res) => {
-  var coin_symbol = req.query.coin_symbol;
-
-  // This will be overwritten if everything goes as planned.
-  let json_response = {
-    error: true,
-    message: "something went wrong"
-  };
-
-  if (!browser) {
-    throw new Error("Browser not active");
-  }
-
-  let page = await browser.newPage();
-
-  try {
-
-    if (coin_symbol === "BTC") {
-      coin_symbol = "BTCUSD";
-    } else {
-      coin_symbol = coin_symbol.toUpperCase() + "BTC/";
+function initRoutes() {
+  app.get("/", async (req, res) => {
+    var coin_symbol = req.query.coin_symbol;
+  
+    // This will be overwritten if everything goes as planned.
+    let json_response = {
+      error: true,
+      message: "something went wrong"
+    };
+  
+    if (!browser) {
+      throw new Error("Browser not active");
     }
-
-    let page_url = await page.goto(
-      "https://www.tradingview.com/symbols/" + coin_symbol, {
-        waitUntil: 'networkidle'
+  
+    let page = await browser.newPage();
+  
+    try {
+      if(!coin_symbol) {
+        return res.json(json_response);
       }
-    );
+  
+      if (coin_symbol === "BTC") {
+        coin_symbol = "BTCUSD";
+      } else {
+        coin_symbol = coin_symbol.toUpperCase() + "BTC";
+      }
 
-    // console.log(page_url);
+      console.log(coin_symbol);
+  
+      await page.goto(
+        "https://www.tradingview.com/symbols/" + coin_symbol, {
+          waitUntil: 'networkidle'
+        }
+      );
 
-    let page_response = await page
-      .waitFor("span.tv-widget-technicals__counter-number")
-      .then(async () => {
+      const ideas_mapped = await page.$$eval(
+        ".tv-widget-idea.js-widget-idea",
+        idea_node_list => {
+            const ideas = [...idea_node_list];
 
-        // Delay is needed for TA valves to render on Heroku
-        await delay(200);
-
-        // Get the "viewport" of the page, as reported by the page.
-        json_response = await page.evaluate(() => {
-
-          const idea_node_list = document.querySelectorAll(".tv-widget-idea.js-widget-idea");
-          const ideas = [...idea_node_list];
-
-          const ideas_mapped = ideas.map(idea => {
-
-            const item = idea.attributes["data-widget-data"] && JSON.parse(idea.attributes["data-widget-data"].value) || {};
-
-            return {
-              title: idea.querySelector(".tv-widget-idea__title").innerHTML,
-              image: idea.querySelectorAll(".tv-widget-idea__cover-link img")[0] && idea.querySelectorAll(".tv-widget-idea__cover-link img")[0].src,
-              date: idea.querySelector(".tv-card-stats__time").attributes["data-timestamp"].value,
-              content: idea.querySelector(".tv-widget-idea__description-text").innerHTML,
-              uploader: idea.querySelector(".tv-card-user-info__name").innerHTML,
-              target: idea.querySelectorAll("a.tv-widget-idea__title")[0] && idea.querySelectorAll("a.tv-widget-idea__title")[0].href,
-              upvotes: parseInt(idea.querySelector(".tv-card-social-item__count").innerHTML),
-              comments: parseInt(idea.querySelector(".tv-card-social-item__count").innerHTML),
-              views: parseInt(idea.querySelector(".tv-card-stats__views").innerText),
-              prediction: idea.querySelector(".tv-card-label") && idea.querySelector(".tv-card-label").innerText,
-            }
-          });
-
-          return {
-            recommendation: document.querySelector(
-              ".tv-widget-technicals__signal-title"
-            ).textContent,
-            sell: document.querySelectorAll(
-              "span.tv-widget-technicals__counter-number"
-            )[0].textContent,
-            neutral: document.querySelectorAll(
-              "span.tv-widget-technicals__counter-number"
-            )[1].textContent,
-            buy: document.querySelectorAll(
-              "span.tv-widget-technicals__counter-number"
-            )[2].textContent,
-            ideas_mapped
-          };
+            return ideas.map(idea => {
+              return {
+                title: idea.querySelector(".tv-widget-idea__title").innerHTML,
+                image: idea.querySelectorAll(".tv-widget-idea__cover-link img")[0] && idea.querySelectorAll(".tv-widget-idea__cover-link img")[0].src,
+                date: idea.querySelector(".tv-card-stats__time").attributes["data-timestamp"].value,
+                content: idea.querySelector(".tv-widget-idea__description-text").innerHTML,
+                uploader: idea.querySelector(".tv-card-user-info__name").innerHTML,
+                target: idea.querySelectorAll("a.tv-widget-idea__title")[0] && idea.querySelectorAll("a.tv-widget-idea__title")[0].href,
+                upvotes: parseInt(idea.querySelector(".tv-card-social-item__count").innerHTML),
+                comments: parseInt(idea.querySelector(".tv-card-social-item__count").innerHTML),
+                views: parseInt(idea.querySelector(".tv-card-stats__views").innerText),
+                prediction: idea.querySelector(".tv-card-label") && idea.querySelector(".tv-card-label").innerText,
+              }
+            });
         });
-      });
 
-    // console.log(page_response);
+      await page.goto(
+        `https://www.tradingview.com/symbols/${coin_symbol}/technicals/`, {
+          waitUntil: 'networkidle'
+        }
+      );
 
-    page.close();
+      await page.waitFor(() => !!document.querySelector("[class^='counterNumber']"));
 
-  } catch (e) {
-    page.close();
+      const recommendation = await page.$$eval("[class^='speedometerSignal']", el => el[1] && el[1].textContent)
 
-    await browser.close()
+      const sell = await page.$$eval(
+        "[class^='counterNumber']",
+        el => el[3] && el[3].textContent
+      );
 
-    initBrowser();
+      const neutral = await page.$$eval(
+        "[class^='counterNumber']",
+        el => el[4] && el[4].textContent
+      );
 
-    console.log(e.message);
-  }
+      const buy = await page.$$eval(
+        "[class^='counterNumber']",
+        el => el[5] && el[5].textContent
+      );
 
-  return res.json(json_response);
-});
+      json_response = {
+        recommendation,
+        sell,
+        neutral,
+        buy,
+        ideas_mapped
+      };
+
+      await page.close();
+
+    } catch(e) {
+      console.log(e);
+      page.close();
+
+      restartBrowser();
+    }
+  
+    return res.json(json_response);
+  });
+}
 
 app.listen(port, function () {
   console.log("App listening on port " + port);
