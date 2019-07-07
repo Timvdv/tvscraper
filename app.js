@@ -47,35 +47,37 @@ try {
 function initRoutes() {
   app.get("/", async (req, res) => {
     var coin_symbol = req.query.coin_symbol;
-  
+
     // This will be overwritten if everything goes as planned.
     let json_response = {
       error: true,
       message: "something went wrong"
     };
-  
+
     if (!browser) {
       throw new Error("Browser not active");
     }
-  
+
     let page = await browser.newPage();
-  
+
     try {
       if(!coin_symbol) {
         return res.json(json_response);
       }
-  
+
       if (coin_symbol === "BTC") {
         coin_symbol = "BTCUSD";
       } else {
         coin_symbol = coin_symbol.toUpperCase() + "BTC";
       }
-  
+
       await page.goto(
         "https://www.tradingview.com/symbols/" + coin_symbol, {
           waitUntil: 'networkidle'
         }
       );
+
+      await delay(3000);
 
       const ideas_mapped = await page.$$eval(
         ".tv-widget-idea.js-widget-idea",
@@ -139,7 +141,7 @@ function initRoutes() {
 
       restartBrowser();
     }
-  
+
     return res.json(json_response);
   });
 }
