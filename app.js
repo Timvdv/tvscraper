@@ -77,8 +77,6 @@ function initRoutes() {
         }
       );
 
-      await delay(3000);
-
       const ideas_mapped = await page.$$eval(
         ".tv-widget-idea.js-widget-idea",
         idea_node_list => {
@@ -87,7 +85,7 @@ function initRoutes() {
             return ideas.map(idea => {
               return {
                 title: idea.querySelector(".tv-widget-idea__title").innerHTML,
-                image: idea.querySelectorAll(".tv-widget-idea__cover-link img")[0] && idea.querySelectorAll(".tv-widget-idea__cover-link img")[0].src,
+                image: idea.querySelectorAll(".tv-widget-idea__cover-link img")[0] && idea.querySelectorAll(".tv-widget-idea__cover-link img")[0].dataset["src"],
                 date: idea.querySelector(".tv-card-stats__time").attributes["data-timestamp"].value,
                 content: idea.querySelector(".tv-widget-idea__description-text").innerHTML,
                 uploader: idea.querySelector(".tv-card-user-info__name").innerHTML,
